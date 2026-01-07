@@ -44,7 +44,7 @@ def main() -> None:
 
     history = instruction
 
-    print("🤖 Чат-бот з питань повернення товару")
+    print("Чат-бот з питань повернення товару")
     print("Натисніть Enter без тексту для завершення діалогу.\n")
 
     while True:
@@ -58,7 +58,7 @@ def main() -> None:
 
         print(f"AI: {response}\n")
 
-    print("\n🔎 Повна історія діалогу:\n")
+    print("\nПовна історія діалогу:\n")
     print(history)
 
 
