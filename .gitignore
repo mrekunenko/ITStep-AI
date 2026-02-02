@@ -34,3 +34,11 @@ secrets.toml
 # OS
 .DS_Store
 Thumbs.db
+
+# ML - великі датасети
+datasets/
+data/
+*/Training/
+*/Test/
+*.zip
+*.tar.gz
