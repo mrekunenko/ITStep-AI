@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment variables
+.env
+
+# Pinecone/Database
+document_ids.json
+file_to_id_map.json
+ids.json
+
+# Test files
+check_pinecone.py
+clear_pinecone.py
+test_search.py
+
+# OS
+.DS_Store
+Thumbs.db
