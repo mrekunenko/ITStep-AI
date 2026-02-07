@@ -20,8 +20,8 @@ INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "omegamed-v3")
 NAMESPACE = os.getenv("PINECONE_NAMESPACE", "default")
 DOCS_FOLDER = os.getenv("DOCS_FOLDER", "docs")
 
-CHUNK_SIZE = 1500
-CHUNK_OVERLAP = 150
+CHUNK_SIZE = 600
+CHUNK_OVERLAP = 100
 
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY не знайдено у .env")
@@ -41,9 +41,9 @@ EMBEDDING_DIMENSION = 3072
 
 embeddings = GoogleGenerativeAIEmbeddings(
     model="models/gemini-embedding-001",
-    google_api_key=GEMINI_API_KEY,
-    task_type="retrieval_document"
+    google_api_key=GEMINI_API_KEY
 )
+
 
 pc = Pinecone(api_key=PINECONE_API_KEY)
 

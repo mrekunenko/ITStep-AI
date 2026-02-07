@@ -1,4 +1,3 @@
-#tools.py
 import os
 from langchain_core.tools import tool
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
@@ -15,8 +14,7 @@ if not GEMINI_API_KEY:
 def _get_vector_store() -> PineconeVectorStore:
     embeddings = GoogleGenerativeAIEmbeddings(
         model="models/gemini-embedding-001",
-        google_api_key=GEMINI_API_KEY,
-        task_type="retrieval_query"
+        google_api_key=GEMINI_API_KEY
     )
 
     return PineconeVectorStore.from_existing_index(
@@ -29,15 +27,25 @@ def _get_vector_store() -> PineconeVectorStore:
 try:
     import streamlit as st
 
-
     @st.cache_resource
     def get_vector_store_cached():
         return _get_vector_store()
 
-
     vector_store = get_vector_store_cached()
 except Exception:
     vector_store = _get_vector_store()
+
+
+# ✅ Debug функція ПІСЛЯ ініціалізації vector_store
+def debug_search(query: str):
+    """Перевірка scores для налаштування threshold"""
+    results = vector_store.similarity_search_with_score(query, k=10)
+    print(f"\n🔍 Debug для запиту: '{query}'")
+    for i, (doc, score) in enumerate(results, 1):
+        filename = doc.metadata.get("filename", "N/A")
+        preview = doc.page_content[:100].replace("\n", " ")
+        print(f"{i}. Score: {score:.3f} | {filename} | {preview}...")
+    print("\n")
 
 
 @tool
@@ -48,15 +56,30 @@ def search_policy_docs(query: str) -> str:
         if not q:
             return "Порожній запит."
 
-        docs = vector_store.similarity_search(q, k=3)
-        if not docs:
+        # Отримуємо результати зі score
+        results_with_scores = vector_store.similarity_search_with_score(q, k=8)
+
+        if not results_with_scores:
             return "У документах не знайдено релевантної інформації."
 
-        # Збираємо унікальні джерела
+        # ✅ ПРАВИЛЬНА ФІЛЬТРАЦІЯ: score > 0.7 = релевантні
+        filtered_docs = [
+            (doc, score)
+            for doc, score in results_with_scores
+            if score > 0.70
+        ]
+
+        # Fallback: якщо нічого не знайшли, беремо 2 найкращі
+        if not filtered_docs:
+            filtered_docs = results_with_scores[:2]
+
+        # Обмежуємо до топ-3
+        filtered_docs = filtered_docs[:3]
+
         sources = set()
         results = []
 
-        for doc in docs:
+        for doc, score in filtered_docs:
             filename = doc.metadata.get("filename", "N/A")
             sources.add(filename)
             results.append((doc.page_content or "").strip())
@@ -64,7 +87,20 @@ def search_policy_docs(query: str) -> str:
         content = "\n\n".join(results)
         sources_text = ", ".join(sorted(sources))
 
-        # Додаємо джерела в кінці
+        return f"{content}\n\n📄 Джерела: {sources_text}"
+
+    except Exception as e:
+        return f"Помилка пошуку: {str(e)}"
+
+        for doc, score in filtered_docs:
+            filename = doc.metadata.get("filename", "N/A")
+            sources.add(filename)
+            content = (doc.page_content or "").strip()
+            results.append(content)
+
+        content = "\n\n".join(results)
+        sources_text = ", ".join(sorted(sources))
+
         return f"{content}\n\n📄 Джерела: {sources_text}"
 
     except Exception as e:
