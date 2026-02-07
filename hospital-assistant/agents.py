@@ -181,7 +181,7 @@ all_tools = [
 agent = create_react_agent(
     model=llm,
     tools=all_tools,
-    state_modifier=SYSTEM_PROMPT,
+    prompt=SYSTEM_PROMPT,
 )
 
 
