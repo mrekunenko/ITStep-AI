@@ -1,26 +1,15 @@
-# Core Dependencies
-streamlit==1.53.1
+﻿streamlit==1.53.1
 python-dotenv==1.2.1
-
-# LangChain stack (узгоджено з лекціями)
 langchain==0.3.20
 langchain-core==0.3.51
 langchain-community==0.3.19
 langchain-text-splitters==0.3.6
 langgraph==0.3.18
-
-# LLM Providers
 langchain-google-genai>=2.0.10
 google-genai>=1.0.0
-
-# Vector Store
 pinecone==6.0.2
 langchain-pinecone==0.2.5
-
-# Database
 sqlalchemy==2.0.46
 psycopg2-binary==2.9.11
-
-# Document Processing (stable, без unstructured)
 pypdf==6.6.2
 python-docx==1.2.0
