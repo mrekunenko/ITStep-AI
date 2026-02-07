@@ -1,44 +1,5 @@
-# Secrets
-credentials.json
-*.env
-.env
-
-# Virtual env
-.venv/
-venv/
-env/
-
-# IDE
+﻿.venv/
 .idea/
-
-# Python
 __pycache__/
-*.py[cod]
-build/
-dist/
-*.egg-info/
-
-# Jupyter
-.ipynb_checkpoints/
-
-# Logs & DB
-*.log
-*.db
-*.sqlite*
-*.sql
-
-# Streamlit
-.streamlit/
-secrets.toml
-
-# OS
-.DS_Store
-Thumbs.db
-
-# ML - великі датасети
-datasets/
-data/
-*/Training/
-*/Test/
-*.zip
-*.tar.gz
+*.pyc
+.env
