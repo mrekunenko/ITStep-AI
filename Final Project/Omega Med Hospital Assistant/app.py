@@ -1,5 +1,6 @@
-#app.py
+# app.py
 import dotenv
+
 dotenv.load_dotenv()
 
 import streamlit as st
@@ -15,9 +16,8 @@ st.set_page_config(
 st.title("🏥 Асистент адміністратора лікарні Омега-Мед")
 st.markdown("Ставте запитання про лікарню, персонал, відділення та відпустки")
 
-# бічна панель
+# Бічна панель
 st.sidebar.markdown("### 🤖 Налаштування")
-
 show_tool_messages = st.sidebar.checkbox("Показувати ToolMessage", value=False)
 
 if st.sidebar.button("🗑 Очистити історію чату", use_container_width=True):
@@ -31,13 +31,12 @@ if "history" in st.session_state:
     st.sidebar.markdown(f"📊 **Запитів у цьому сеансі:** {user_messages}")
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("🛠 **Інструменти:** 5")
-st.sidebar.markdown("📌 **1** Pinecone | **4** SQL")
+st.sidebar.markdown("🛠 **Інструменти:** 6")
+st.sidebar.markdown("📌 **1** Pinecone | **5** SQL")
 st.sidebar.markdown("---")
-
 st.sidebar.subheader("⚡ Приклади запитів")
 
-# розділ з документами
+# Розділ з документами
 with st.sidebar.expander("📄 Пошук у документах", expanded=False):
     st.caption("General.pdf")
     general_questions = [
@@ -52,7 +51,6 @@ with st.sidebar.expander("📄 Пошук у документах", expanded=Fal
             st.rerun()
 
     st.divider()
-
     st.caption("For_wokers.docx")
     workers_questions = [
         "Яка тривалість щорічної основної відпустки?",
@@ -65,7 +63,7 @@ with st.sidebar.expander("📄 Пошук у документах", expanded=Fal
             st.session_state["selected_question"] = q
             st.rerun()
 
-# розділ з базою даних
+# Розділ з базою даних
 with st.sidebar.expander("💾 Перегляд даних", expanded=False):
     if st.button("🧩 Показати схему БД (колонки)", key="db_schema", use_container_width=True):
         st.session_state["selected_question"] = "Покажи схему бази даних"
@@ -93,8 +91,7 @@ with st.sidebar.expander("💾 Перегляд даних", expanded=False):
             st.session_state["selected_question"] = question
             st.rerun()
 
-
-# управління відпустками
+# Управління відпустками
 with st.sidebar.expander("🏖 Управління відпустками", expanded=False):
     if st.button("📋 Покажи відпустки лікаря ID=3", key="vac_show1", use_container_width=True):
         st.session_state["selected_question"] = "Покажи всі відпустки лікаря ID=3"
@@ -108,21 +105,19 @@ with st.sidebar.expander("🏖 Управління відпустками", exp
         st.session_state["selected_question"] = "Покажи всі відпустки лікаря ID=3"
         st.rerun()
 
-    if st.button("🗑 Видали останню відпустку", key="vac_delete", use_container_width=True):
-        st.session_state["selected_question"] = (
-            "Знайди відпустку лікаря ID=3 з 2026-03-15 до 2026-03-25, візьми її ID і видали"
-        )
+    if st.button("🗑 Видали відпустку 15-25 березня", key="vac_delete", use_container_width=True):
+        st.session_state["selected_question"] = "Видали відпустку лікаря ID=3 з 2026-03-15 до 2026-03-25"
         st.rerun()
 
     if st.button("✅ Покажи відпустки востаннє", key="vac_show3", use_container_width=True):
         st.session_state["selected_question"] = "Покажи всі відпустки лікаря ID=3"
         st.rerun()
 
-# ініціалізація історії
+# Ініціалізація історії
 if "history" not in st.session_state:
     st.session_state["history"] = [SystemMessage(SYSTEM_PROMPT)]
 
-# вивід чату
+# Вивід чату
 for msg in st.session_state["history"]:
     if isinstance(msg, SystemMessage):
         continue
@@ -149,7 +144,7 @@ for msg in st.session_state["history"]:
             with st.chat_message("assistant"):
                 st.markdown(msg.content)
 
-# обробка вибраного запитання з кнопок
+# Обробка вибраного запитання з кнопок
 if "selected_question" in st.session_state:
     user_query = st.session_state.pop("selected_question")
     st.session_state["history"].append(HumanMessage(user_query))
@@ -160,7 +155,7 @@ if "selected_question" in st.session_state:
 
     st.rerun()
 
-# поле вводу
+# Поле вводу
 user_query = st.chat_input("Напишіть ваше запитання про лікарню...")
 
 if user_query:

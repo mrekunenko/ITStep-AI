@@ -1,4 +1,4 @@
-#tools.py
+# tools.py
 import os
 from langchain_core.tools import tool
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
@@ -42,13 +42,14 @@ except Exception:
 
 @tool
 def search_policy_docs(query: str) -> str:
-    """Search in hospital policy documents via Pinecone vector database."""
+    """Пошук у внутрішніх документах лікарні через векторну базу даних Pinecone."""
     try:
         q = (query or "").strip()
         if not q:
             return "Порожній запит."
 
         docs = vector_store.similarity_search(q, k=3)
+
         if not docs:
             return "У документах не знайдено релевантної інформації."
 
