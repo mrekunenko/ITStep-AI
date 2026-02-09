@@ -2,10 +2,13 @@
 import dotenv
 
 dotenv.load_dotenv()
-
+import pandas as pd
+import plotly.express as px
 import streamlit as st
+from sqlalchemy import text
+from sql_tools import engine
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
-from agents import get_agent_response, SYSTEM_PROMPT
+from agents import get_agent_response, SYSTEM_PROMPT, all_tools
 
 st.set_page_config(
     page_title="Асистент лікарні Омега-Мед",
@@ -31,8 +34,8 @@ if "history" in st.session_state:
     st.sidebar.markdown(f"📊 **Запитів у цьому сеансі:** {user_messages}")
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("🛠 **Інструменти:** 6")
-st.sidebar.markdown("📌 **1** Pinecone | **5** SQL")
+st.sidebar.markdown(f"🛠 **Інструменти:** {len(all_tools)}")
+st.sidebar.markdown("📌 **1** Pinecone | **7** SQL")
 st.sidebar.markdown("---")
 st.sidebar.subheader("⚡ Приклади запитів")
 
@@ -69,30 +72,108 @@ with st.sidebar.expander("💾 Перегляд даних", expanded=False):
         st.session_state["selected_question"] = "Покажи схему бази даних"
         st.rerun()
 
-    sql_questions = [
-        "Покажи список всіх лікарів",
-        "Які відділення є в лікарні?",
-        "Покажи всі палати лікарні",
-        "Покажи перелік обстежень",
-        "Покажи список захворювань",
-        "Покажи перелік медичних спеціалізацій",
-        "Покажи всі відпустки лікарів",
-        "Покажи всі донації",
-        "Покажи всіх спонсорів лікарні",
-        "Покажи лікарів разом з їх спеціалізаціями",
-        "Покажи лікарів та їх відділення",
-        "Покажи лікарів разом з їх обстеженнями",
-        "Покажи донації разом зі спонсорами та відділеннями",
-        "Покажи обстеження разом з хворобами та відділеннями",
-    ]
+    if st.button("📊 Загальна статистика лікарні", key="hospital_stats", use_container_width=True):
+        st.session_state["selected_question"] = "Покажи загальну статистику лікарні"
+        st.rerun()
 
-    for i, question in enumerate(sql_questions):
-        if st.button(question, key=f"data_sql_{i}", use_container_width=True):
+    if st.button("📊 Графік фінансування відділень", key="dept_finance_chart", use_container_width=True):
+        st.session_state["show_dept_finance_chart"] = True
+        st.rerun()
+
+    # 👥 ЛІКАРІ
+    st.markdown("#### 👥 Лікарі")
+    doctor_questions = [
+        "Покажи список всіх лікарів за алфавітом",
+        "Покажи повну інформацію про лікаря Коваленко",
+        "Які лікарі працюють у відділенні кардіології?",
+        "Скільки лікарів працює в кожному відділенні?",
+        "Покажи лікарів із зарплатою вище 80000 грн",
+        "Які лікарі мають спеціалізацію хірургія?",
+        "Покажи топ-5 лікарів за рівнем зарплати",
+        "Які лікарі зараз на відпустці?",
+    ]
+    for i, question in enumerate(doctor_questions):
+        if st.button(question, key=f"data_doctor_{i}", use_container_width=True):
+            st.session_state["selected_question"] = question
+            st.rerun()
+
+    # 🏥 ВІДДІЛЕННЯ
+    st.markdown("#### 🏥 Відділення")
+    department_questions = [
+        "Які відділення є в лікарні?",
+        "Яке відділення має найбільше фінансування?",
+        "Покажи відділення з бюджетом менше 600000 грн",
+        "Скільки відділень у кожному корпусі?",
+        "Яке середнє фінансування відділень?",
+    ]
+    for i, question in enumerate(department_questions):
+        if st.button(question, key=f"data_dept_{i}", use_container_width=True):
+            st.session_state["selected_question"] = question
+            st.rerun()
+
+    # 🏖 ВІДПУСТКИ
+    st.markdown("#### 🏖 Відпустки")
+    vacation_questions = [
+        "Покажи всі відпустки лікарів",
+        "Які відпустки заплановані на березень 2026?",
+        "Скільки відпусток у кожного лікаря?",
+        "Які лікарі мають відпустку у квітні?",
+        "Скільки днів відпустки має лікар Шевченко?",
+    ]
+    for i, question in enumerate(vacation_questions):
+        if st.button(question, key=f"data_vac_{i}", use_container_width=True):
+            st.session_state["selected_question"] = question
+            st.rerun()
+
+    # 💰 ФІНАНСИ
+    st.markdown("#### 💰 Фінанси")
+    finance_questions = [
+        "Покажи всі донації за сумою (від більшої до меншої)",
+        "Який спонсор зробив найбільший внесок?",
+        "Скільки донацій отримало кожне відділення?",
+        "Яка загальна сума донацій за 2026 рік?",
+    ]
+    for i, question in enumerate(finance_questions):
+        if st.button(question, key=f"data_fin_{i}", use_container_width=True):
+            st.session_state["selected_question"] = question
+            st.rerun()
+
+    # 🏥 МЕДИЧНІ ДАНІ
+    st.markdown("#### 🧬 Медичні дані")
+    medical_questions = [
+        "Покажи всі палати лікарні за корпусами",
+        "Які обстеження проводяться у відділенні кардіології?",
+        "Покажи список усіх захворювань за рівнем тяжкості",
+        "Які медичні спеціалізації є в лікарні?",
+        "Скільки обстежень проводить кожне відділення?",
+        "Які захворювання мають найвищий рівень тяжкості?",
+    ]
+    for i, question in enumerate(medical_questions):
+        if st.button(question, key=f"data_med_{i}", use_container_width=True):
+            st.session_state["selected_question"] = question
+            st.rerun()
+
+    # 🔗 СКЛАДНІ ЗАПИТИ
+    st.markdown("#### 🔗 Складні запити")
+    complex_questions = [
+        "Покажи лікарів разом з їх спеціалізаціями",
+        "Покажи лікарів, їх відділення та спеціалізації",
+        "Покажи донації зі спонсорами та відділеннями",
+        "Які обстеження призначені для конкретних хвороб?",
+        "Покажи лікарів разом з їх обстеженнями та відділеннями",
+        "Яке відділення отримало найбільше донацій?",
+    ]
+    for i, question in enumerate(complex_questions):
+        if st.button(question, key=f"data_complex_{i}", use_container_width=True):
             st.session_state["selected_question"] = question
             st.rerun()
 
 # Управління відпустками
 with st.sidebar.expander("🏖 Управління відпустками", expanded=False):
+    if st.button("ℹ️ Інформація про лікаря ID=3", key="doc_info_3", use_container_width=True):
+        st.session_state["selected_question"] = "Покажи всю інформацію про лікаря ID=3"
+        st.rerun()
+
     if st.button("📋 Покажи відпустки лікаря ID=3", key="vac_show1", use_container_width=True):
         st.session_state["selected_question"] = "Покажи всі відпустки лікаря ID=3"
         st.rerun()
@@ -154,6 +235,43 @@ if "selected_question" in st.session_state:
         st.session_state["history"] = response["messages"]
 
     st.rerun()
+
+# Блок для графіка фінансування відділень
+if st.session_state.get("show_dept_finance_chart"):
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT name AS department_name, financing
+            FROM departments
+            ORDER BY financing DESC
+        """))
+        rows = result.fetchall()
+
+    if rows:
+        df = pd.DataFrame(rows, columns=["Відділення", "Фінансування"])
+        st.subheader("📊 Фінансування відділень")
+
+        fig = px.bar(
+            df,
+            x="Відділення",
+            y="Фінансування",
+            text="Фінансування",
+            color="Відділення",
+            color_discrete_sequence=px.colors.qualitative.Set2,
+        )
+        fig.update_traces(texttemplate="%{text:,.0f} грн", textposition="outside")
+        fig.update_layout(
+            yaxis_title="Фінансування, грн",
+            xaxis_title="Відділення",
+            uniformtext_minsize=10,
+            uniformtext_mode="hide",
+            bargap=0.4,
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("Немає даних про фінансування відділень.")
+
+    # Скидаємо прапорець
+    st.session_state["show_dept_finance_chart"] = False
 
 # Поле вводу
 user_query = st.chat_input("Напишіть ваше запитання про лікарню...")

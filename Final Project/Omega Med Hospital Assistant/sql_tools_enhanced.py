@@ -1,4 +1,4 @@
-# sql_tools.py
+# sql_tools_enhanced.py - SQL інструменти з покращеним форматуванням
 import os
 import dotenv
 from datetime import datetime
@@ -9,6 +9,7 @@ from langchain_community.utilities import SQLDatabase
 from formatting_utils import (
     format_table_value,
     format_vacation_period,
+    format_date_ukrainian,
     format_currency
 )
 
@@ -32,11 +33,7 @@ DATABASE_URL = (
     f"@{DB_HOST}:{DB_PORT}/{DB_NAME}?sslmode=require"
 )
 
-engine = create_engine(
-    DATABASE_URL,
-    poolclass=NullPool,
-    future=True,
-)
+engine = create_engine(DATABASE_URL, poolclass=NullPool, future=True)
 
 try:
     import streamlit as st
@@ -72,42 +69,12 @@ def show_db_schema() -> str:
     except Exception as e:
         return f"Помилка schema lookup: {str(e)}"
 
-# Людяні назви колонок для виводу
-PRETTY_COLUMN_NAMES = {
-    "surname": "Прізвище",
-    "name": "Ім'я",
-    "patronymic": "По батькові",
-    "phone": "Телефон",
-    "salary": "Зарплата",
-    "premium": "Премія",
-    "department_name": "Відділення",
-    "name_department": "Відділення",
-    "number_of_doctors": "Кількість лікарів",
-    "building": "Корпус",
-    "financing": "Фінансування",
-    "start_date": "Початок",
-    "end_date": "Кінець",
-    "day_of_week": "День тижня",
-    "start_time": "Початок",
-    "end_time": "Кінець",
-    "disease_name": "Захворювання",
-    "severity": "Тяжкість",
-    "specialization_name": "Спеціалізація",
-    "sponsor_name": "Спонсор",
-    "amount": "Сума",
-    "examination_name": "Обстеження",
-    "ward_name": "Палата",
-    "doctor_full_name": "Лікар",
-    "donation_date": "Дата доната",
-}
-
 
 @tool
 def run_sql_query(query: str) -> str:
     """
     Виконати SELECT запит до бази даних лікарні.
     Повертає відформатовані результати (дати, гроші, телефони).
-    Використовується для перегляду даних про лікарів, відділення, обстеження, донації, відпустки.
     """
     query = (query or "").strip()
 
@@ -126,13 +93,13 @@ def run_sql_query(query: str) -> str:
         if not rows:
             return "Запит виконано, але результатів не знайдено."
 
-        # Приховуємо ID колонки (id, doctor_id, department_id, тощо)
+        # Приховуємо ID колонки
         safe_columns = []
         safe_indices = []
 
         for i, col in enumerate(columns):
             col_lower = col.lower()
-            if col_lower == "id" or col_lower.endswith("_id"):
+            if col_lower == 'id' or col_lower.endswith('_id'):
                 continue
             safe_columns.append(col)
             safe_indices.append(i)
@@ -140,19 +107,19 @@ def run_sql_query(query: str) -> str:
         if not safe_columns:
             return "Результати містять тільки службову інформацію (ID)."
 
-        # Особливий випадок: тільки start_date + end_date → список періодів відпусток
-        if set(safe_columns) == {"start_date", "end_date"}:
+        # ✅ ОСОБЛИВИЙ ВИПАДОК: ПЕРІОД ВІДПУСТКИ
+        if set(safe_columns) == {'start_date', 'end_date'}:
             periods = []
             for i, row in enumerate(rows, 1):
-                # гарантуємо порядок: start_date, end_date
-                start = row[columns.index("start_date")]
-                end = row[columns.index("end_date")]
+                start = row[safe_indices[0]]
+                end = row[safe_indices[1]]
                 formatted_period = format_vacation_period(start, end)
                 periods.append(f"{i}. {formatted_period}")
+
             result_text = "\n".join(periods)
             return f"Знайдено записів: {len(rows)}\n\n{result_text}"
 
-        # Одна колонка → нумерований список
+        # ✅ ОДНА КОЛОНКА → НУМЕРОВАНИЙ СПИСОК
         if len(safe_columns) == 1:
             col_name = safe_columns[0]
             items = []
@@ -160,21 +127,12 @@ def run_sql_query(query: str) -> str:
                 value = row[safe_indices[0]]
                 formatted_value = format_table_value(col_name, value)
                 items.append(f"{i}. {formatted_value}")
+
             result_text = "\n".join(items)
             return f"Знайдено записів: {len(rows)}\n\n{result_text}"
 
-        # Замість технічних назв колонок показуємо "красиві"
-        pretty_headers = []
-        for col in safe_columns:
-            key = col.lower()
-            if key in PRETTY_COLUMN_NAMES:
-                pretty_headers.append(PRETTY_COLUMN_NAMES[key])
-            elif key.endswith("_name"):
-                pretty_headers.append("Назва")
-            else:
-                pretty_headers.append(col)
-        header = " | ".join(pretty_headers)
-
+        # ✅ БАГАТО КОЛОНОК → ТАБЛИЦЯ З ФОРМАТУВАННЯМ
+        header = " | ".join(safe_columns)
         separator = " | ".join(["---"] * len(safe_columns))
 
         data_rows = []
@@ -185,6 +143,7 @@ def run_sql_query(query: str) -> str:
                 value = row[idx]
                 formatted_value = format_table_value(col_name, value)
                 formatted_row.append(formatted_value)
+
             data_rows.append(" | ".join(formatted_row))
 
         table = f"{header}\n{separator}\n" + "\n".join(data_rows)
@@ -195,70 +154,10 @@ def run_sql_query(query: str) -> str:
 
 
 @tool
-def get_doctor_id(name: str = "", surname: str = "") -> str:
-    """
-    Знайти ID лікаря за ім'ям та/або прізвищем.
-    Можна передати тільки прізвище (name="") або тільки ім'я (surname="").
-
-    :param name: Ім'я лікаря (опціонально)
-    :param surname: Прізвище лікаря (опціонально)
-    :return: ID лікаря або повідомлення про помилку
-    """
-    try:
-        name = (name or "").strip()
-        surname = (surname or "").strip()
-
-        if not name and not surname:
-            return "Необхідно вказати хоча б ім'я або прізвище"
-
-        # Формуємо запит динамічно
-        conditions = []
-        params = {}
-
-        if surname:
-            conditions.append("LOWER(surname) = LOWER(:surname)")
-            params["surname"] = surname
-
-        if name:
-            conditions.append("LOWER(name) = LOWER(:name)")
-            params["name"] = name
-
-        where_clause = " AND ".join(conditions)
-
-        query = text(f"""
-            SELECT id, surname, name, patronymic 
-            FROM doctors 
-            WHERE {where_clause}
-        """)
-
-        with engine.connect() as conn:
-            result = conn.execute(query, params)
-            rows = result.fetchall()
-
-        if not rows:
-            search_term = f"'{name} {surname}'" if name and surname else f"'{surname or name}'"
-            return f"Лікаря {search_term} не знайдено в базі даних"
-
-        if len(rows) > 1:
-            options = "\n".join([
-                f"ID={row[0]}: {row[1]} {row[2]} {row[3] or ''}"
-                for row in rows
-            ])
-            return f"Знайдено {len(rows)} лікарів:\n{options}\n\nУточніть запит"
-
-        doctor = rows[0]
-        full_name = f"{doctor[1]} {doctor[2]} {doctor[3] or ''}".strip()
-        return f"ID лікаря {full_name}: {doctor[0]}"
-
-    except Exception as e:
-        return f"Помилка пошуку: {str(e)}"
-
-
-@tool
 def get_doctor_info(doctor_id: int) -> str:
     """
-    Отримати повну інформацію про лікаря за ID:
-    ПІБ, телефон, зарплата, премія, відділення, спеціалізації.
+    Отримати повну інформацію про лікаря за ID.
+    Включає ПІБ, телефон, зарплату, відділення, спеціалізації.
     """
     try:
         query = text("""
@@ -303,76 +202,68 @@ def get_doctor_info(doctor_id: int) -> str:
 💎 **Премія:** {premium}
 🏥 **Відділення:** {department}
 📋 **Спеціалізації:** {specializations}
-""".strip()
-        return info
+"""
+        return info.strip()
 
     except Exception as e:
         return f"Помилка отримання інформації: {str(e)}"
 
 
 @tool
-def get_hospital_stats() -> str:
-    """
-    Повна статистика лікарні з обстеженнями за 2026.
-    """
+def get_doctor_id(name: str = "", surname: str = "") -> str:
+    """Знайти ID лікаря за ім'ям та/або прізвищем."""
     try:
-        stats_queries = [
-            "SELECT COUNT(*) FROM doctors",
-            "SELECT COUNT(*) FROM departments",
-            "SELECT COUNT(*) FROM wards",
-            "SELECT COUNT(*) FROM examinations",
-            "SELECT AVG(salary)::numeric(10,0) FROM doctors",
-            "SELECT SUM(financing)::numeric(12,0) FROM departments",
-            "SELECT COUNT(*) FROM vacations WHERE CURRENT_DATE BETWEEN start_date AND end_date",
-            "SELECT COUNT(*) FROM vacations",
-        ]
+        name = (name or "").strip()
+        surname = (surname or "").strip()
 
-        results = []
+        if not name and not surname:
+            return "Необхідно вказати хоча б ім'я або прізвище"
+
+        conditions = []
+        params = {}
+
+        if surname:
+            conditions.append("LOWER(surname) = LOWER(:surname)")
+            params["surname"] = surname
+
+        if name:
+            conditions.append("LOWER(name) = LOWER(:name)")
+            params["name"] = name
+
+        where_clause = " AND ".join(conditions)
+
+        query = text(f"""
+            SELECT id, surname, name, patronymic 
+            FROM doctors 
+            WHERE {where_clause}
+        """)
+
         with engine.connect() as conn:
-            # Основна статистика
-            for query in stats_queries:
-                result = conn.execute(text(query))
-                value = result.scalar()
-                results.append(value)
+            result = conn.execute(query, params)
+            rows = result.fetchall()
 
-            # 🔥 Обстеження за 2026
-            exams_2026_query = """
-            SELECT COUNT(*) FROM examinations 
-            WHERE exam_date >= '2026-01-01'
-            """
-            exams_2026 = conn.execute(text(exams_2026_query)).scalar()
+        if not rows:
+            search_term = f"'{name} {surname}'" if name and surname else f"'{surname or name}'"
+            return f"Лікаря {search_term} не знайдено в базі даних"
 
-        stats_text = f"""
-🏥 СТАТИСТИКА ЛІКАРНІ «ОМЕГА-МЕД»
+        if len(rows) > 1:
+            options = "\n".join([
+                f"ID={row[0]}: {row[1]} {row[2]} {row[3] or ''}"
+                for row in rows
+            ])
+            return f"Знайдено {len(rows)} лікарів:\n{options}\n\nУточніть запит"
 
-👨‍⚕️ Лікарів: {int(results[0])}
-🏢 Відділень: {int(results[1])}
-🛏️ Палат: {int(results[2])}
-📋 Обстежень загалом: {int(results[3])}
-🔥 Обстежень проведено за 2026: {int(exams_2026)}
-
-💰 Середня зарплата: {format_currency(results[4]) or 'немає даних'}
-💎 Загальне фінансування: {format_currency(results[5]) or 'немає даних'}
-🏖 Активних відпусток: {int(results[6])}
-📊 Всього відпусток: {int(results[7])}
-        """.strip()
-
-        return stats_text
+        doctor = rows[0]
+        full_name = f"{doctor[1]} {doctor[2]} {doctor[3] or ''}".strip()
+        return f"ID лікаря {full_name}: {doctor[0]}"
 
     except Exception as e:
-        return f"❌ Помилка: {str(e)}"
+        return f"Помилка пошуку: {str(e)}"
 
 
 @tool
 def add_vacation(doctor_id: int, start_date: str, end_date: str) -> str:
-    """
-    Додати відпустку для лікаря.
-
-    :param doctor_id: ID лікаря
-    :param start_date: Дата початку (формат YYYY-MM-DD)
-    :param end_date: Дата завершення (формат YYYY-MM-DD)
-    :return: Повідомлення про успіх або помилку
-    """
+    """Додати відпустку для лікаря."""
     try:
         try:
             start = datetime.strptime(start_date, "%Y-%m-%d").date()
@@ -395,7 +286,8 @@ def add_vacation(doctor_id: int, start_date: str, end_date: str) -> str:
                 "end_date": end_date,
             })
 
-        return f"✅ Відпустку додано для лікаря ID {doctor_id}: з {start_date} до {end_date}"
+        formatted_period = format_vacation_period(start_date, end_date)
+        return f"✅ Відпустку додано для лікаря ID {doctor_id}: {formatted_period}"
 
     except Exception as e:
         return f"Помилка додавання відпустки: {str(e)}"
@@ -403,17 +295,8 @@ def add_vacation(doctor_id: int, start_date: str, end_date: str) -> str:
 
 @tool
 def delete_vacation_by_dates(doctor_id: int, start_date: str, end_date: str) -> str:
-    """
-    Видалити відпустку лікаря за датами.
-    Не потребує знання vacation_id.
-
-    :param doctor_id: ID лікаря
-    :param start_date: Дата початку (формат YYYY-MM-DD)
-    :param end_date: Дата завершення (формат YYYY-MM-DD)
-    :return: Повідомлення про успіх або помилку
-    """
+    """Видалити відпустку лікаря за датами."""
     try:
-        # Знаходимо відпустку
         find_query = text("""
             SELECT id FROM vacations
             WHERE doctor_id = :doctor_id
@@ -430,16 +313,17 @@ def delete_vacation_by_dates(doctor_id: int, start_date: str, end_date: str) -> 
             row = result.fetchone()
 
         if not row:
-            return f"Відпустку лікаря ID={doctor_id} з {start_date} до {end_date} не знайдено"
+            formatted_period = format_vacation_period(start_date, end_date)
+            return f"Відпустку лікаря ID={doctor_id} ({formatted_period}) не знайдено"
 
         vacation_id = row[0]
 
-        # Видаляємо
         delete_query = text("DELETE FROM vacations WHERE id = :id")
         with engine.begin() as conn:
             conn.execute(delete_query, {"id": vacation_id})
 
-        return f"✅ Відпустку видалено (лікар ID={doctor_id}, {start_date} → {end_date})"
+        formatted_period = format_vacation_period(start_date, end_date)
+        return f"✅ Відпустку видалено (лікар ID={doctor_id}, {formatted_period})"
 
     except Exception as e:
         return f"Помилка видалення: {str(e)}"
