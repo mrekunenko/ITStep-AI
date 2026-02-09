@@ -33,3 +33,5 @@ test_search.py
 # OS
 .DS_Store
 Thumbs.db
+
+echo "../../credentials.json" >> .gitignore
